@@ -23,9 +23,11 @@ const initializeDatabase = async (db) => {
     await collection.insertMany(documents);
   }
 
-  const confirmations = db.collection('confirmations');
-  await confirmations.deleteMany({});
-  await confirmations.createIndex({ id: 1 }, { unique: true });
+  // Bookings are created by the application, so the collection starts empty.
+  // It was named 'confirmations' before the Week 03 refactor.
+  const bookings = db.collection('bookings');
+  await bookings.deleteMany({});
+  await bookings.createIndex({ id: 1 }, { unique: true });
 };
 
 export { initializeDatabase, starterCollections };

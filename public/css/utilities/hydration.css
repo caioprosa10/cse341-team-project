@@ -1,0 +1,96 @@
+@layer utilities {
+    /* Shared states for the sections that are filled in from the API. */
+    .trips-state,
+    .schedules-state,
+    .bookings-state {
+        margin-bottom: var(--space-md);
+        color: var(--clr-text-secondary);
+    }
+
+    .trips-error,
+    .schedules-error,
+    .bookings-error {
+        color: #8f1f1f;
+    }
+
+    /* Trip details: month picker above the schedules. */
+    .schedule-filter {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        margin-bottom: var(--space-md);
+    }
+
+    .schedule-filter select {
+        padding: var(--space-xs) var(--space-sm);
+        border: 1px solid var(--clr-border);
+        border-radius: var(--radius-sm);
+        font-family: inherit;
+        font-size: var(--font-size-sm);
+    }
+
+    /* Bookings admin page. */
+    .bookings-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-lg);
+    }
+
+    .booking-card {
+        padding: var(--space-lg);
+        border: 1px solid var(--clr-border);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .booking-card-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-sm);
+        margin-bottom: var(--space-md);
+    }
+
+    .booking-card-header h2 {
+        margin: 0;
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-lg);
+    }
+
+    .booking-date {
+        color: var(--clr-text-secondary);
+        font-size: var(--font-size-sm);
+    }
+
+    .booking-specs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+        gap: var(--space-sm);
+        margin: 0 0 var(--space-md);
+    }
+
+    .booking-specs dt {
+        color: var(--clr-text-secondary);
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .booking-specs dd {
+        margin: 0;
+        font-size: var(--font-size-md);
+    }
+
+    .booking-passengers {
+        margin: 0;
+        padding-left: var(--space-lg);
+        font-size: var(--font-size-sm);
+    }
+
+    @media (min-width: 48rem) {
+        .bookings-list {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+}

@@ -1,0 +1,48 @@
+<%- include('./partials/header') %>
+
+<section class="bookings-admin">
+    <h1><%- title %></h1>
+    <p>Every booking stored in the system, newest first.</p>
+
+    <div class="bookings-state" id="bookings-loading">Loading bookings...</div>
+    <div class="bookings-state bookings-error" id="bookings-error" hidden></div>
+    <div class="bookings-state" id="bookings-empty" hidden>No bookings have been made yet.</div>
+
+    <div class="bookings-list" id="bookings-list"></div>
+
+    <template id="booking-card-template">
+        <article class="booking-card">
+            <header class="booking-card-header">
+                <h2 data-field="reference"></h2>
+                <span class="booking-date" data-field="created"></span>
+            </header>
+
+            <dl class="booking-specs">
+                <div class="spec-item">
+                    <dt>Trip</dt>
+                    <dd data-field="trip"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Schedule</dt>
+                    <dd data-field="schedule"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Ticket Class</dt>
+                    <dd data-field="ticket-class"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Travel Day</dt>
+                    <dd data-field="day"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Passengers</dt>
+                    <dd data-field="passenger-count"></dd>
+                </div>
+            </dl>
+
+            <ul class="booking-passengers" data-field="passengers"></ul>
+        </article>
+    </template>
+</section>
+
+<%- include('./partials/footer') %>
