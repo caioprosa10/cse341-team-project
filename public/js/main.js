@@ -257,6 +257,164 @@ const hookTripSchedules = () => {
 };
 
 /* ------------------------------------------------------------------ *
+ * Trip details page: station information                              *
+ * ------------------------------------------------------------------ */
+
+const renderStation = (container, station) => {
+    container.replaceChildren();
+
+    const heading = document.createElement('h3');
+    heading.textContent = station.name;
+    container.appendChild(heading);
+
+    const location = document.createElement('p');
+    location.textContent = `${station.prefecture} prefecture, ${station.region} region`;
+    container.appendChild(location);
+
+    if (station.description) {
+        const description = document.createElement('p');
+        description.textContent = station.description;
+        container.appendChild(description);
+    }
+
+    if (station.facilities && station.facilities.length > 0) {
+        const list = document.createElement('ul');
+        list.className = 'station-facilities';
+
+        station.facilities.forEach((facility) => {
+            const item = document.createElement('li');
+            item.textContent = facility.replace(/_/g, ' ');
+            list.appendChild(item);
+        });
+
+        container.appendChild(list);
+    }
+};
+
+const hookStationDetails = () => {
+    const buttons = document.querySelectorAll('.station-info-btn');
+
+    if (buttons.length === 0) {
+        return;
+    }
+
+    buttons.forEach((button) => {
+        button.addEventListener('click', async () => {
+            const stationId = button.dataset.stationId;
+            const panel = document.getElementById(`station-details-${stationId}`);
+
+            if (!panel) {
+                return;
+            }
+
+            const isOpen = button.getAttribute('aria-expanded') === 'true';
+
+            if (isOpen) {
+                panel.hidden = true;
+                button.setAttribute('aria-expanded', 'false');
+
+                return;
+            }
+
+            panel.hidden = false;
+            button.setAttribute('aria-expanded', 'true');
+
+            if (panel.dataset.loaded === 'true') {
+                return;
+            }
+
+            panel.textContent = 'Loading station information...';
+
+            try {
+                const station = await fetchJson(`/api/stations/${encodeURIComponent(stationId)}`);
+                renderStation(panel, station);
+                panel.dataset.loaded = 'true';
+            } catch (error) {
+                panel.textContent = 'Unable to load this station right now.';
+            }
+        });
+    });
+};
+
+/* ------------------------------------------------------------------ *
+ * Booking page: ticket classes available on the selected day          *
+ * ------------------------------------------------------------------ */
+
+const applyTicketAvailability = (availableClasses) => {
+    const radios = document.querySelectorAll('input[name="ticketClass"]');
+    let checkedIsAvailable = false;
+    let firstAvailable = null;
+
+    radios.forEach((radio) => {
+        const label = radio.closest('.ticket-card');
+        const isAvailable = availableClasses.includes(radio.value);
+
+        radio.disabled = !isAvailable;
+
+        if (label) {
+            label.classList.toggle('ticket-unavailable', !isAvailable);
+        }
+
+        if (isAvailable) {
+            if (!firstAvailable) {
+                firstAvailable = radio;
+            }
+            if (radio.checked) {
+                checkedIsAvailable = true;
+            }
+        } else if (radio.checked) {
+            radio.checked = false;
+            radio.removeAttribute('checked');
+        }
+    });
+
+    if (!checkedIsAvailable && firstAvailable) {
+        firstAvailable.checked = true;
+        firstAvailable.setAttribute('checked', true);
+        firstAvailable.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+};
+
+const hookTicketAvailability = () => {
+    const dayLabels = document.querySelectorAll('.days-display label');
+    const ticketRadios = document.querySelectorAll('input[name="ticketClass"]');
+
+    if (dayLabels.length === 0 || ticketRadios.length === 0) {
+        return;
+    }
+
+    const loadForDay = async (day) => {
+        if (!day) {
+            return;
+        }
+
+        try {
+            const ticketClasses = await fetchJson(`/api/ticket-classes?day=${encodeURIComponent(day)}`);
+            applyTicketAvailability(ticketClasses.map((ticketClass) => ticketClass.class));
+        } catch (error) {
+            // Leave every option enabled rather than blocking the booking.
+            applyTicketAvailability([...ticketRadios].map((radio) => radio.value));
+        }
+    };
+
+    dayLabels.forEach((label) => {
+        label.addEventListener('click', () => {
+            const input = label.querySelector('input');
+
+            if (input) {
+                loadForDay(input.value);
+            }
+        });
+    });
+
+    const selectedDay = document.querySelector('input[name="selectedDay"]:checked');
+
+    if (selectedDay) {
+        loadForDay(selectedDay.value);
+    }
+};
+
+/* ------------------------------------------------------------------ *
  * Bookings admin page                                                 *
  * ------------------------------------------------------------------ */
 
@@ -312,5 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hookTrainsCatalog();
     hookTripsCatalog();
     hookTripSchedules();
+    hookStationDetails();
+    hookTicketAvailability();
     hookBookingsAdmin();
 });
