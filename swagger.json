@@ -117,6 +117,92 @@
         }
       }
     },
+    "/api/ticket-classes": {
+      "get": {
+        "summary": "Get the ticket classes",
+        "description": "Returns every ticket class. When the optional day is given, only the classes sold on that weekday are returned.\n",
+        "tags": [
+          "Ticket Classes"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "day",
+            "required": false,
+            "description": "A lowercase weekday name, such as monday",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching ticket classes"
+          },
+          "400": {
+            "description": "The day is not a valid weekday name"
+          },
+          "500": {
+            "description": "Failed to fetch ticket classes"
+          }
+        }
+      }
+    },
+    "/api/stations": {
+      "get": {
+        "summary": "Get all stations",
+        "tags": [
+          "Stations"
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of stations"
+          },
+          "500": {
+            "description": "Failed to fetch stations"
+          }
+        }
+      }
+    },
+    "/api/stations/{id}": {
+      "get": {
+        "summary": "Get one station by id",
+        "tags": [
+          "Stations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "The custom station id, such as nagoya",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching station"
+          },
+          "404": {
+            "description": "Station not found"
+          },
+          "500": {
+            "description": "Failed to fetch station"
+          }
+        }
+      }
+    },
     "/api/trains": {
       "get": {
         "summary": "Get all trains",
