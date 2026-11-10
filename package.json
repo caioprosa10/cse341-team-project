@@ -3,17 +3,20 @@
 	"dependencies": {
 		"ejs": "^6.0.1",
 		"express": "^5.1.0",
-		"mongodb": "^7.5.0"
+		"mongodb": "^7.5.0",
+		"mongoose": "^8.21.1",
+		"swagger-ui-express": "^5.0.1"
 	},
 	"scripts": {
 		"db:import": "node --env-file=.env src/db/import.js",
 		"dev": "nodemon --env-file=.env server.js",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
 		"reset": "node restore.js 3000 3001",
 		"start": "node --env-file=.env server.js",
+		"swagger": "node swagger.js",
 		"test": "vitest run",
-		"test:watch": "vitest",
-		"lint": "eslint .",
-		"lint:fix": "eslint . --fix"
+		"test:watch": "vitest"
 	},
 	"type": "module",
 	"version": "1.0.0",
@@ -22,6 +25,7 @@
 		"mongodb-memory-server": "^11.2.0",
 		"nodemon": "^3.1.10",
 		"supertest": "^7.2.2",
+		"swagger-jsdoc": "^6.2.8",
 		"vitest": "^4.1.10",
 		"ws": "^8.18.3"
 	}

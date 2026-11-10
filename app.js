@@ -3,6 +3,8 @@ import Path from 'path';
 import { fileURLToPath } from 'url';
 import pkg from './package.json' with { type: 'json' };
 import globalMiddleware from './src/middleware/global.js';
+import swaggerDocument from './swagger.json' with { type: 'json' };
+import swaggerUi from 'swagger-ui-express';
 import routes from './src/routes/router.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +26,9 @@ app.set('views', Path.join(__dirname, 'src/views'));
 // Parse JSON and URL-encoded request bodies.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Interactive API documentation.
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use(globalMiddleware);
 app.use('/', routes);
