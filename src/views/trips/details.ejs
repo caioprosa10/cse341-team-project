@@ -51,10 +51,18 @@
                 <div class="station">
                     <span class="station-label">Start</span>
                     <span class="station-name"><%= details.startStation.charAt(0).toUpperCase() + details.startStation.slice(1) %></span>
+                    <button type="button" class="station-info-btn" data-station-id="<%= details.startStation %>" aria-expanded="false">
+                        Station info
+                    </button>
+                    <div class="station-details" id="station-details-<%= details.startStation %>" hidden></div>
                 </div>
                 <div class="station">
                     <span class="station-label">End</span>
                     <span class="station-name"><%= details.endStation.charAt(0).toUpperCase() + details.endStation.slice(1) %></span>
+                    <button type="button" class="station-info-btn" data-station-id="<%= details.endStation %>" aria-expanded="false">
+                        Station info
+                    </button>
+                    <div class="station-details" id="station-details-<%= details.endStation %>" hidden></div>
                 </div>
             </div>
         </div>
