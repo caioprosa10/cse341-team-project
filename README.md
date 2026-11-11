@@ -60,7 +60,7 @@ This repository is set up as a **GitHub template**. Use the template feature to 
    ```
 5. Install dependencies: `npm install`
 6. Copy `.env.example` to `.env` and set `MONGODB_URI` (and optionally `MONGODB_DB_NAME`) for your MongoDB instance.
-7. Import the starter data with `npm run db:import`. This replaces the starter collections and clears any confirmations in that database.
+7. Import the starter data with `npm run db:import`. This replaces the starter collections and clears any bookings in that database.
 8. Run the automated tests with `npm test`. Tests use a temporary local database and do not change the database in your `.env` file.
 9. Start the development server: `npm run dev`
 
@@ -86,12 +86,45 @@ If you want to contribute improvements to the documentation or educational conte
 
 Forking maintains the connection to the original repository and allows you to contribute back. Using the template creates an independent copy for your own work.
 
+## Project structure
+
+The backend follows a model / view / controller split:
+
+```
+src/models/schemas/   Mongoose schemas. Field definitions and the collection name.
+src/models/           Queries. Model functions return plain objects and never see req or res.
+src/controllers/      Two kinds of function: API controllers that send JSON,
+                      and EJS controllers that render a page.
+src/routes/
+  api-routes.js       JSON endpoints, with their Swagger comments.
+  ejs-routes.js       Page routes.
+  router.js           Mounts both.
+src/views/            EJS templates. Dynamic sections are filled by public/js/main.js.
+```
+
+Pages keep their layout in EJS, but sections that change without a reload (the
+trip list, the schedules of a trip, the bookings table, ticket availability and
+station details) are filled in the browser from the API.
+
+## API documentation
+
+Run the server and open `/api-docs` for the interactive Swagger page. The
+document is generated from the `@openapi` comments in `src/routes/api-routes.js`:
+
+```
+npm run swagger
+```
+
+Regenerate it whenever a route or one of those comments changes, and commit the
+resulting `swagger.json` so the deployed app can serve the docs.
+
 ## Technology Stack
 
 - **Backend**: Node.js with Express framework
 - **Templating**: EJS
 - **Styling**: Modern nested CSS with custom properties
-- **Database**: MongoDB, using the official MongoDB Node.js driver
+- **Database**: MongoDB, accessed through Mongoose
+- **API documentation**: Swagger (swagger-jsdoc and swagger-ui-express)
 - **Testing**: Vitest, Supertest, and MongoDB Memory Server
 
 ## Skills You'll Develop
