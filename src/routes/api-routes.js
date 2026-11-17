@@ -1,9 +1,18 @@
 // src/routes/api-routes.js
-import { getAllBookings } from '../controllers/bookings.js';
+import {
+    getAllBookings,
+    putBooking,
+    removeBooking
+} from '../controllers/bookings.js';
+import { getUser, listUsers, putUser, removeUser } from '../controllers/users.js';
+import {
+    requireApiLogin,
+    requireApiRole
+} from '../middleware/auth.js';
 import { getAllStations, getStationById } from '../controllers/stations.js';
 import { getTrainById } from '../controllers/trains.js';
 import { getTrainsForPage } from '../controllers/trains-page.js';
-import { getAllTrips, getTripById } from '../controllers/trips.js';
+import { getAllTrips, getTripById, putTrip, removeTrip } from '../controllers/trips.js';
 import { getSchedulesForTrip, getSchedulesForTripAndMonth } from '../controllers/schedules.js';
 import { listTicketClasses } from '../controllers/ticket-classes.js';
 import { Router } from 'express';
@@ -105,7 +114,7 @@ router.get('/api/trips/:id/schedules', async (req, res) => {
  *       500:
  *         description: Failed to fetch bookings
  */
-router.get('/api/bookings', getAllBookings);
+router.get('/api/bookings', requireApiLogin, getAllBookings);
 
 /**
  * @openapi
@@ -216,5 +225,237 @@ router.get('/api/trains', getTrainsForPage);
  *         description: Failed to fetch train
  */
 router.get('/api/trains/:id', getTrainById);
+
+/**
+ * @openapi
+ * /api/bookings/{id}:
+ *   put:
+ *     summary: Update a booking
+ *     description: >
+ *       Any signed in user may update a booking where their email is one of
+ *       the passengers. An admin may update any booking.
+ *     tags:
+ *       - Bookings
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: The booking reference
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ticketClass:
+ *                 type: string
+ *               selectedDay:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: The updated booking
+ *       400:
+ *         description: Nothing to update
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Not your booking
+ *       404:
+ *         description: Booking not found
+ *   delete:
+ *     summary: Delete a booking
+ *     tags:
+ *       - Bookings
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Deleted
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Not your booking
+ *       404:
+ *         description: Booking not found
+ */
+router.put('/api/bookings/:id', requireApiLogin, putBooking);
+router.delete('/api/bookings/:id', requireApiLogin, removeBooking);
+
+/**
+ * @openapi
+ * /api/users:
+ *   get:
+ *     summary: Get users
+ *     description: >
+ *       An admin receives every user. Any other signed in user receives a list
+ *       holding only their own record. The password hash is never included.
+ *     tags:
+ *       - Users
+ *     responses:
+ *       200:
+ *         description: A list of users
+ *       401:
+ *         description: Authentication required
+ */
+router.get('/api/users', requireApiLogin, listUsers);
+
+/**
+ * @openapi
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get one user
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: The user
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Not your account
+ *       404:
+ *         description: User not found
+ *   put:
+ *     summary: Update a user
+ *     description: >
+ *       Only the display name and the email can be changed. The role is never
+ *       read from the body, so a customer cannot promote themselves.
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: The updated user
+ *       400:
+ *         description: Nothing to update
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Not your account
+ *       404:
+ *         description: User not found
+ *       409:
+ *         description: That email is already in use
+ *   delete:
+ *     summary: Delete a user
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Deleted
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Not your account
+ *       404:
+ *         description: User not found
+ */
+router.get('/api/users/:id', requireApiLogin, getUser);
+router.put('/api/users/:id', requireApiLogin, putUser);
+router.delete('/api/users/:id', requireApiLogin, removeUser);
+
+/**
+ * @openapi
+ * /api/trips/{id}:
+ *   put:
+ *     summary: Update a trip
+ *     description: Admin role only. Reading the trips stays public.
+ *     tags:
+ *       - Trips
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: The custom trip id, such as alpine-panorama
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               region:
+ *                 type: string
+ *               startStation:
+ *                 type: string
+ *               endStation:
+ *                 type: string
+ *               duration:
+ *                 type: string
+ *               distance:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: The updated trip
+ *       400:
+ *         description: Nothing to update
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Admin role required
+ *       404:
+ *         description: Trip not found
+ *   delete:
+ *     summary: Delete a trip
+ *     description: Admin role only.
+ *     tags:
+ *       - Trips
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Deleted
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Admin role required
+ *       404:
+ *         description: Trip not found
+ */
+router.put('/api/trips/:id', requireApiRole('admin'), putTrip);
+router.delete('/api/trips/:id', requireApiRole('admin'), removeTrip);
 
 export default router;

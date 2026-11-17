@@ -1,8 +1,11 @@
 // src/controllers/bookings.js
 import {
     createBooking,
+    deleteBooking,
     getAllBookings as findAllBookings,
-    getBookingById
+    getBookingById,
+    getBookingsForEmail,
+    updateBooking
 } from '../models/bookings.js';
 import { getAllTicketClasses } from '../models/ticket-classes.js';
 import { generateConfirmationCode } from '../includes/helpers.js';
@@ -13,15 +16,78 @@ import { getTripById } from '../models/trips.js';
  * API controllers: these send JSON.                                   *
  * ------------------------------------------------------------------ */
 
+/*
+ * A booking has no owner field: the people on it are passengers. A customer
+ * owns a booking when their email is one of the passenger emails, which is
+ * also how the list is filtered.
+ */
+const ownsBooking = (req, bookingDocument) => {
+    if (req.user.role === 'admin') {
+        return true;
+    }
+
+    const email = String(req.user.email || '').toLowerCase();
+
+    return (bookingDocument.passengers || []).some((passenger) => {
+        return String(passenger.email || '').toLowerCase() === email;
+    });
+};
+
 const getAllBookings = async (req, res) => {
     try {
-        const bookings = await findAllBookings();
+        const bookings = req.user.role === 'admin'
+            ? await findAllBookings()
+            : await getBookingsForEmail(req.user.email);
 
         return res.status(200).json(bookings);
     } catch (error) {
         console.error('Error fetching bookings:', error);
 
         return res.status(500).json({ error: 'Failed to fetch bookings' });
+    }
+};
+
+const putBooking = async (req, res, next) => {
+    try {
+        const existing = await getBookingById(req.params.id);
+
+        if (!existing) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+
+        if (!ownsBooking(req, existing)) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        const updated = await updateBooking(req.params.id, req.body);
+
+        if (updated === null) {
+            return res.status(400).json({ message: 'Send a ticketClass or a selectedDay to update.' });
+        }
+
+        return res.status(200).json(updated);
+    } catch (error) {
+        return next(error);
+    }
+};
+
+const removeBooking = async (req, res, next) => {
+    try {
+        const existing = await getBookingById(req.params.id);
+
+        if (!existing) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+
+        if (!ownsBooking(req, existing)) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        await deleteBooking(req.params.id);
+
+        return res.status(204).send();
+    } catch (error) {
+        return next(error);
     }
 };
 
@@ -129,9 +195,18 @@ const bookingsAdminPage = (req, res) => {
     return res.render('bookings', { title: 'Bookings Admin' });
 };
 
+// Welcome by display name; the booking list is fetched from /api/bookings,
+// which already answers with only what this user may see.
+const userDashboardPage = (req, res) => {
+    return res.render('dashboard', { title: 'Your Dashboard' });
+};
+
 export {
     bookingPage,
     bookingsAdminPage,
+    putBooking,
+    removeBooking,
+    userDashboardPage,
     confirmationPage,
     getAllBookings,
     processBookingRequest
