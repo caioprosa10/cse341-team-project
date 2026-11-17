@@ -1,4 +1,7 @@
 import express from 'express';
+import session from 'express-session';
+import { loadSessionUser } from './src/middleware/auth.js';
+import { randomBytes } from 'node:crypto';
 import Path from 'path';
 import { fileURLToPath } from 'url';
 import pkg from './package.json' with { type: 'json' };
@@ -26,6 +29,35 @@ app.set('views', Path.join(__dirname, 'src/views'));
 // Parse JSON and URL-encoded request bodies.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+/*
+ * Session management. This has to be registered before anything that reads
+ * req.session, so it comes before the routes and before loadSessionUser.
+ * saveUninitialized is false so that a visitor who never signs in does not
+ * get a stored session, and rolling measures the one hour from the user's
+ * last request instead of from the moment they signed in.
+ */
+const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
+
+if (!process.env.SESSION_SECRET) {
+    console.warn('SESSION_SECRET is not set. Using a temporary secret, so sessions will not survive a restart.');
+}
+
+app.use(session({
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
+    cookie: {
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 1000
+    }
+}));
+
+// Copies the session user onto req.user and res.locals.user for the guards
+// and for the templates. Not a guard itself.
+app.use(loadSessionUser);
 
 // Interactive API documentation.
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));

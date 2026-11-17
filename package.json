@@ -16,7 +16,8 @@
 		"start": "node --env-file=.env server.js",
 		"swagger": "node swagger.js",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"make-admin": "node --env-file=.env src/db/make-admin.js"
 	},
 	"type": "module",
 	"version": "1.0.0",
