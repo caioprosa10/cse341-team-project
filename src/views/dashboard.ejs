@@ -18,23 +18,42 @@
         You have no bookings yet. <a href="/trips">Browse the trips</a> to make one.
     </div>
 
-    <div class="bookings-grid" id="bookings-list"></div>
+    <div class="bookings-list" id="bookings-list"></div>
 
+    <%# Mesma marcacao da pagina de bookings admin, para reaproveitar o CSS
+        de hydration.css em vez de duplicar regras para o mesmo cartao. %>
     <template id="booking-card-template">
-        <div class="booking-card">
-            <div class="booking-header">
-                <span class="booking-reference" data-field="reference"></span>
-                <span class="booking-created" data-field="created"></span>
-            </div>
-            <dl class="booking-details">
-                <div><dt>Trip</dt><dd data-field="trip"></dd></div>
-                <div><dt>Schedule</dt><dd data-field="schedule"></dd></div>
-                <div><dt>Ticket class</dt><dd data-field="ticket-class"></dd></div>
-                <div><dt>Travel day</dt><dd data-field="day"></dd></div>
-                <div><dt>Passengers</dt><dd data-field="passenger-count"></dd></div>
+        <article class="booking-card">
+            <header class="booking-card-header">
+                <h2 data-field="reference"></h2>
+                <span class="booking-date" data-field="created"></span>
+            </header>
+
+            <dl class="booking-specs">
+                <div class="spec-item">
+                    <dt>Trip</dt>
+                    <dd data-field="trip"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Schedule</dt>
+                    <dd data-field="schedule"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Ticket Class</dt>
+                    <dd data-field="ticket-class"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Travel Day</dt>
+                    <dd data-field="day"></dd>
+                </div>
+                <div class="spec-item">
+                    <dt>Passengers</dt>
+                    <dd data-field="passenger-count"></dd>
+                </div>
             </dl>
+
             <ul class="booking-passengers" data-field="passengers"></ul>
-        </div>
+        </article>
     </template>
 </div>
 <%- include('partials/footer') %>
