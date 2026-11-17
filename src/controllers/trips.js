@@ -1,7 +1,9 @@
 // src/controllers/trips.js
 import {
+    deleteTrip,
     getAllTrips as findAllTrips,
-    getTripById as findTripById
+    getTripById as findTripById,
+    updateTrip
 } from '../models/trips.js';
 
 const MONTH_NAMES = [
@@ -91,4 +93,51 @@ const tripDetailsPage = async (req, res, next) => {
     }
 };
 
-export { getAllTrips, getTripById, listTripsPage, tripDetailsPage };
+const putTrip = async (req, res, next) => {
+    try {
+        const existing = await findTripById(req.params.id);
+
+        if (!existing) {
+            return res.status(404).json({ message: 'Trip not found' });
+        }
+
+        const updated = await updateTrip(req.params.id, req.body);
+
+        if (updated === null) {
+            return res.status(400).json({ message: 'Send at least one field to update.' });
+        }
+
+        return res.status(200).json(updated);
+    } catch (error) {
+        return next(error);
+    }
+};
+
+const removeTrip = async (req, res, next) => {
+    try {
+        const wasDeleted = await deleteTrip(req.params.id);
+
+        if (!wasDeleted) {
+            return res.status(404).json({ message: 'Trip not found' });
+        }
+
+        return res.status(204).send();
+    } catch (error) {
+        return next(error);
+    }
+};
+
+// Filled by public/js/main.js from the public /api/trips endpoint.
+const tripsAdminPage = (req, res) => {
+    return res.render('admin/trips', { title: 'Trip Admin' });
+};
+
+export {
+    getAllTrips,
+    getTripById,
+    listTripsPage,
+    putTrip,
+    removeTrip,
+    tripDetailsPage,
+    tripsAdminPage
+};
