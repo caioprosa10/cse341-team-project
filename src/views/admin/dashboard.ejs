@@ -1,0 +1,15 @@
+<%- include('../partials/header') %>
+<div class="dashboard">
+    <h1>Welcome to the Admin Dashboard</h1>
+    <p class="dashboard-intro">
+        Signed in as <strong><%= user.name %></strong> with the
+        <strong><%= user.role %></strong> role.
+    </p>
+
+    <ul class="dashboard-links">
+        <li><a href="/admin/users">User admin</a></li>
+        <li><a href="/bookings-admin">Booking admin</a></li>
+        <li><a href="/admin/trips">Trip admin</a></li>
+    </ul>
+</div>
+<%- include('../partials/footer') %>

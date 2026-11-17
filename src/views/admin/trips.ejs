@@ -1,0 +1,54 @@
+<%- include('../partials/header') %>
+<div class="admin-page">
+    <h1><%= title %></h1>
+    <p class="admin-intro">
+        Every trip in the catalogue. Stations are chosen from the stations that
+        already exist.
+    </p>
+
+    <div class="admin-state admin-error" id="trips-admin-error" hidden></div>
+    <div class="admin-state" id="trips-admin-empty" hidden>No trips to show.</div>
+
+    <div class="admin-rows" id="trips-admin-list"></div>
+
+    <template id="trip-row-template">
+        <form class="admin-row admin-row-wide" data-field="row">
+            <div class="admin-cell">
+                <label>Name
+                    <input type="text" name="name" data-field="name" required>
+                </label>
+            </div>
+            <div class="admin-cell">
+                <label>Region
+                    <input type="text" name="region" data-field="region" required>
+                </label>
+            </div>
+            <div class="admin-cell">
+                <label>Start station
+                    <select name="startStation" data-field="start-station"></select>
+                </label>
+            </div>
+            <div class="admin-cell">
+                <label>End station
+                    <select name="endStation" data-field="end-station"></select>
+                </label>
+            </div>
+            <div class="admin-cell">
+                <label>Duration
+                    <input type="text" name="duration" data-field="duration" required>
+                </label>
+            </div>
+            <div class="admin-cell">
+                <label>Distance (km)
+                    <input type="number" name="distance" data-field="distance" min="0" required>
+                </label>
+            </div>
+            <div class="admin-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-danger" data-field="delete">Delete</button>
+            </div>
+            <p class="admin-row-message" data-field="message" hidden></p>
+        </form>
+    </template>
+</div>
+<%- include('../partials/footer') %>

@@ -1,0 +1,34 @@
+<%- include('../partials/header') %>
+<div class="admin-page">
+    <h1><%= title %></h1>
+    <p class="admin-intro" id="users-scope">Loading...</p>
+
+    <div class="admin-state admin-error" id="users-error" hidden></div>
+    <div class="admin-state" id="users-empty" hidden>No users to show.</div>
+
+    <div class="admin-rows" id="users-list"></div>
+
+    <template id="user-row-template">
+        <form class="admin-row" data-field="row">
+            <div class="admin-cell">
+                <label>Display name
+                    <input type="text" name="name" data-field="name" required>
+                </label>
+            </div>
+            <div class="admin-cell">
+                <label>Email
+                    <input type="email" name="email" data-field="email" required>
+                </label>
+            </div>
+            <div class="admin-cell admin-meta">
+                <span class="admin-badge" data-field="role"></span>
+            </div>
+            <div class="admin-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-danger" data-field="delete">Delete</button>
+            </div>
+            <p class="admin-row-message" data-field="message" hidden></p>
+        </form>
+    </template>
+</div>
+<%- include('../partials/footer') %>
