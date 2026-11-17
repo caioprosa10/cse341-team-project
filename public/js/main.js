@@ -466,6 +466,215 @@ const hookBookingsAdmin = async () => {
     }
 };
 
+/* ------------------------------------------------------------------ *
+ * User admin page                                                    *
+ * ------------------------------------------------------------------ */
+
+const sendJson = async (url, method, payload) => {
+    const options = { method, headers: { 'Content-Type': 'application/json' } };
+
+    if (payload) {
+        options.body = JSON.stringify(payload);
+    }
+
+    const response = await fetch(url, options);
+
+    if (response.status === 204) {
+        return null;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || `Request failed (${response.status})`);
+    }
+
+    return data;
+};
+
+const showRowMessage = (row, text, isError) => {
+    const target = row.querySelector('[data-field="message"]');
+
+    if (!target) {
+        return;
+    }
+
+    target.hidden = false;
+    target.textContent = text;
+    target.classList.toggle('is-error', Boolean(isError));
+};
+
+const hookUsersAdmin = async () => {
+    const listEl = document.getElementById('users-list');
+    const templateEl = document.getElementById('user-row-template');
+    const errorEl = document.getElementById('users-error');
+    const emptyEl = document.getElementById('users-empty');
+    const scopeEl = document.getElementById('users-scope');
+
+    if (!listEl || !templateEl) {
+        return;
+    }
+
+    const buildRow = (person) => {
+        const fragment = templateEl.content.cloneNode(true);
+        const row = fragment.querySelector('[data-field="row"]');
+        const nameInput = fragment.querySelector('[data-field="name"]');
+        const emailInput = fragment.querySelector('[data-field="email"]');
+
+        nameInput.value = person.name;
+        emailInput.value = person.email;
+        fragment.querySelector('[data-field="role"]').textContent =
+            person.role && person.role.name ? person.role.name : 'customer';
+
+        row.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            try {
+                const updated = await sendJson(`/api/users/${person._id}`, 'PUT', {
+                    name: nameInput.value,
+                    email: emailInput.value
+                });
+
+                nameInput.value = updated.name;
+                emailInput.value = updated.email;
+                showRowMessage(row, 'Saved.', false);
+            } catch (error) {
+                showRowMessage(row, error.message, true);
+            }
+        });
+
+        fragment.querySelector('[data-field="delete"]').addEventListener('click', async () => {
+            try {
+                await sendJson(`/api/users/${person._id}`, 'DELETE');
+                row.remove();
+                showState(emptyEl, listEl.children.length === 0);
+            } catch (error) {
+                showRowMessage(row, error.message, true);
+            }
+        });
+
+        return fragment;
+    };
+
+    try {
+        const people = await fetchJson('/api/users');
+        const fragment = document.createDocumentFragment();
+
+        people.forEach((person) => {
+            fragment.appendChild(buildRow(person));
+        });
+
+        listEl.replaceChildren(fragment);
+        showState(emptyEl, people.length === 0);
+
+        if (scopeEl) {
+            scopeEl.textContent = people.length === 1
+                ? 'Your account.'
+                : `Every user in the system (${people.length}).`;
+        }
+    } catch (error) {
+        if (scopeEl) {
+            scopeEl.textContent = '';
+        }
+
+        setError(errorEl, 'Unable to load the users right now.');
+    }
+};
+
+/* ------------------------------------------------------------------ *
+ * Trip admin page                                                    *
+ * ------------------------------------------------------------------ */
+
+const fillStationOptions = (selectEl, stations, selected) => {
+    stations.forEach((station) => {
+        const option = document.createElement('option');
+
+        option.value = station.id;
+        option.textContent = station.name;
+        option.selected = station.id === selected;
+        selectEl.appendChild(option);
+    });
+};
+
+const hookTripsAdmin = async () => {
+    const listEl = document.getElementById('trips-admin-list');
+    const templateEl = document.getElementById('trip-row-template');
+    const errorEl = document.getElementById('trips-admin-error');
+    const emptyEl = document.getElementById('trips-admin-empty');
+
+    if (!listEl || !templateEl) {
+        return;
+    }
+
+    const buildRow = (tripItem, stations) => {
+        const fragment = templateEl.content.cloneNode(true);
+        const row = fragment.querySelector('[data-field="row"]');
+        const fields = {
+            name: fragment.querySelector('[data-field="name"]'),
+            region: fragment.querySelector('[data-field="region"]'),
+            duration: fragment.querySelector('[data-field="duration"]'),
+            distance: fragment.querySelector('[data-field="distance"]')
+        };
+        const startSelect = fragment.querySelector('[data-field="start-station"]');
+        const endSelect = fragment.querySelector('[data-field="end-station"]');
+
+        fields.name.value = tripItem.name;
+        fields.region.value = tripItem.region;
+        fields.duration.value = tripItem.duration;
+        fields.distance.value = tripItem.distance;
+        fillStationOptions(startSelect, stations, tripItem.startStation);
+        fillStationOptions(endSelect, stations, tripItem.endStation);
+
+        row.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            try {
+                await sendJson(`/api/trips/${tripItem.id}`, 'PUT', {
+                    name: fields.name.value,
+                    region: fields.region.value,
+                    startStation: startSelect.value,
+                    endStation: endSelect.value,
+                    duration: fields.duration.value,
+                    distance: Number(fields.distance.value)
+                });
+
+                showRowMessage(row, 'Saved.', false);
+            } catch (error) {
+                showRowMessage(row, error.message, true);
+            }
+        });
+
+        fragment.querySelector('[data-field="delete"]').addEventListener('click', async () => {
+            try {
+                await sendJson(`/api/trips/${tripItem.id}`, 'DELETE');
+                row.remove();
+                showState(emptyEl, listEl.children.length === 0);
+            } catch (error) {
+                showRowMessage(row, error.message, true);
+            }
+        });
+
+        return fragment;
+    };
+
+    try {
+        const [trips, stations] = await Promise.all([
+            fetchJson('/api/trips'),
+            fetchJson('/api/stations')
+        ]);
+        const fragment = document.createDocumentFragment();
+
+        trips.forEach((tripItem) => {
+            fragment.appendChild(buildRow(tripItem, stations));
+        });
+
+        listEl.replaceChildren(fragment);
+        showState(emptyEl, trips.length === 0);
+    } catch (error) {
+        setError(errorEl, 'Unable to load the trips right now.');
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     hookTrainsCatalog();
     hookTripsCatalog();
@@ -473,4 +682,6 @@ document.addEventListener('DOMContentLoaded', () => {
     hookStationDetails();
     hookTicketAvailability();
     hookBookingsAdmin();
+    hookUsersAdmin();
+    hookTripsAdmin();
 });
