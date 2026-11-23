@@ -161,12 +161,34 @@ const fillFilter = (selectEl, values) => {
 };
 
 /*
- * The trip list asks /api/trips for one page at a time. The page number and
- * the page size live in the address bar (/trips?page=2), so a refresh, a
- * bookmark or the back button lands on the same page. The browser passes
- * them to the API as they are, and the API decides whether they are valid.
+ * The trip list asks /api/trips for one page of matching trips at a time.
+ * The page, the page size and the filters live in the address bar
+ * (/trips?region=central&q=gorge&page=2), so a refresh, a bookmark or the back
+ * button shows the same results. The browser passes them to the API as they
+ * are, and the API decides whether they are valid.
  */
-const TRIP_QUERY_KEYS = ['page', 'limit'];
+const TRIP_QUERY_KEYS = ['page', 'limit', 'region', 'season', 'q'];
+
+// Describes the filters the API reports in meta.filters, for the summary.
+const describeTripFilters = (filters) => {
+    if (!filters) {
+        return '';
+    }
+
+    const parts = [];
+
+    if (filters.region) {
+        parts.push(`region ${capitalise(filters.region)}`);
+    }
+    if (filters.season) {
+        parts.push(`best in ${filters.season}`);
+    }
+    if (filters.q) {
+        parts.push(`matching "${filters.q}"`);
+    }
+
+    return parts.length > 0 ? ` (${parts.join(', ')})` : '';
+};
 
 const hookTripsCatalog = () => {
     const listEl = document.getElementById('trips-list');
@@ -179,8 +201,11 @@ const hookTripsCatalog = () => {
     const prevButton = document.getElementById('trips-prev');
     const nextButton = document.getElementById('trips-next');
     const pageStatusEl = document.getElementById('trips-page-status');
+    const filtersForm = document.getElementById('filters');
     const regionSelect = document.getElementById('region-filter');
     const seasonSelect = document.getElementById('season-filter');
+    const searchInput = document.getElementById('trip-search');
+    const clearButton = document.getElementById('trip-filters-clear');
 
     if (!listEl || !templateEl) {
         return;
@@ -189,25 +214,15 @@ const hookTripsCatalog = () => {
     let pageTrips = [];
     let meta = null;
 
-    // The region and season dropdowns still filter in the browser, so for now
-    // they narrow the page that is on screen.
     const renderCards = () => {
-        const region = regionSelect ? regionSelect.value : 'all';
-        const season = seasonSelect ? seasonSelect.value : 'all';
-        const visible = pageTrips.filter((trip) => {
-            const regionMatches = region === 'all' || trip.region === region;
-            const seasonMatches = season === 'all' || trip.bestSeason === season;
-
-            return regionMatches && seasonMatches;
-        });
-
         const fragment = document.createDocumentFragment();
-        visible.forEach((trip) => {
+
+        pageTrips.forEach((trip) => {
             fragment.appendChild(buildTripCard(trip, templateEl));
         });
 
         listEl.replaceChildren(fragment);
-        showState(emptyEl, visible.length === 0);
+        showState(emptyEl, meta !== null && meta.totalItems === 0);
     };
 
     const renderPagination = () => {
@@ -221,14 +236,36 @@ const hookTripsCatalog = () => {
         const first = (meta.page - 1) * meta.limit + 1;
         const last = first + pageTrips.length - 1;
 
-        summaryEl.textContent = `Showing ${first}-${last} of ${meta.totalItems} trips`;
+        summaryEl.textContent = `Showing ${first}-${last} of ${meta.totalItems} trips`
+            + describeTripFilters(meta.filters);
         pageStatusEl.textContent = `Page ${meta.page} of ${meta.totalPages}`;
         prevButton.disabled = !meta.hasPreviousPage;
         nextButton.disabled = !meta.hasNextPage;
         showState(paginationEl, true);
     };
 
-    // Copies the paging values from the address bar into the API request.
+    // Puts the values from the address bar back into the form controls.
+    const syncControlsFromAddress = () => {
+        const params = new URLSearchParams(window.location.search);
+        const pickOption = (selectEl, value) => {
+            if (!selectEl) {
+                return;
+            }
+
+            const wanted = (value || '').toLowerCase();
+            const exists = [...selectEl.options].some((option) => option.value === wanted);
+            selectEl.value = exists ? wanted : 'all';
+        };
+
+        pickOption(regionSelect, params.get('region'));
+        pickOption(seasonSelect, params.get('season'));
+
+        if (searchInput) {
+            searchInput.value = params.get('q') || '';
+        }
+    };
+
+    // Copies the query values from the address bar into the API request.
     const buildApiUrl = () => {
         const pageParams = new URLSearchParams(window.location.search);
         const apiParams = new URLSearchParams();
@@ -244,17 +281,21 @@ const hookTripsCatalog = () => {
         return query ? `/api/trips?${query}` : '/api/trips';
     };
 
-    const setPageInAddress = (page, replace) => {
-        const params = new URLSearchParams(window.location.search);
-        params.set('page', String(page));
-
-        const url = `${window.location.pathname}?${params.toString()}`;
+    const writeAddress = (params, replace) => {
+        const query = params.toString();
+        const url = query ? `${window.location.pathname}?${query}` : window.location.pathname;
 
         if (replace) {
             window.history.replaceState(null, '', url);
         } else {
             window.history.pushState(null, '', url);
         }
+    };
+
+    const setPageInAddress = (page, replace) => {
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', String(page));
+        writeAddress(params, replace);
     };
 
     const load = async () => {
@@ -277,10 +318,6 @@ const hookTripsCatalog = () => {
 
             pageTrips = payload.trips;
             meta = payload.meta;
-
-            fillFilter(regionSelect, [...new Set(pageTrips.map((trip) => trip.region))].sort());
-            fillFilter(seasonSelect, [...new Set(pageTrips.map((trip) => trip.bestSeason))].sort());
-
             renderCards();
             renderPagination();
         } catch (error) {
@@ -307,19 +344,87 @@ const hookTripsCatalog = () => {
         listEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
+    /*
+     * Applies the form to the address and reloads. Any change to the filters
+     * starts again at page 1, because page 3 of the old results may not
+     * exist in the new ones. The page size is kept.
+     */
+    const applyFilters = () => {
+        const params = new URLSearchParams(window.location.search);
+        const values = {
+            region: regionSelect && regionSelect.value !== 'all' ? regionSelect.value : '',
+            season: seasonSelect && seasonSelect.value !== 'all' ? seasonSelect.value : '',
+            q: searchInput ? searchInput.value.trim() : ''
+        };
+
+        Object.entries(values).forEach(([key, value]) => {
+            if (value) {
+                params.set(key, value);
+            } else {
+                params.delete(key);
+            }
+        });
+        params.delete('page');
+
+        writeAddress(params, false);
+        load();
+    };
+
     prevButton.addEventListener('click', () => goToPage(meta.page - 1));
     nextButton.addEventListener('click', () => goToPage(meta.page + 1));
 
+    // The dropdowns apply at once; the keyword waits for Enter or Search so
+    // the API is not called on every keystroke.
     if (regionSelect) {
-        regionSelect.addEventListener('change', renderCards);
+        regionSelect.addEventListener('change', applyFilters);
     }
     if (seasonSelect) {
-        seasonSelect.addEventListener('change', renderCards);
+        seasonSelect.addEventListener('change', applyFilters);
+    }
+    if (filtersForm) {
+        filtersForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            applyFilters();
+        });
+    }
+    if (clearButton) {
+        clearButton.addEventListener('click', () => {
+            if (regionSelect) {
+                regionSelect.value = 'all';
+            }
+            if (seasonSelect) {
+                seasonSelect.value = 'all';
+            }
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            applyFilters();
+        });
     }
 
     // Back and forward buttons change the address without reloading.
-    window.addEventListener('popstate', load);
+    window.addEventListener('popstate', () => {
+        syncControlsFromAddress();
+        load();
+    });
 
+    // The dropdown options come from the API; the list loads at the same time.
+    const loadFilterOptions = async () => {
+        try {
+            const options = await fetchJson('/api/trips/filters');
+
+            fillFilter(regionSelect, options.regions);
+            fillFilter(seasonSelect, options.seasons);
+        } catch (error) {
+            // The list still works from the address bar without the dropdowns.
+            console.error('Unable to load the trip filters:', error);
+        }
+
+        syncControlsFromAddress();
+    };
+
+    syncControlsFromAddress();
+    loadFilterOptions();
     load();
 };
 

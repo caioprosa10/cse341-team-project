@@ -1,17 +1,30 @@
 <%- include('../partials/header') %>
 <h1><%- title %></h1>
 
-<div id="filters">
-    Search by Region:
-    <select id="region-filter">
-        <option value="all">All Regions</option>
-    </select>
+<form id="filters" class="trip-filters" role="search">
+    <label>
+        Search by Region:
+        <select id="region-filter" name="region">
+            <option value="all">All Regions</option>
+        </select>
+    </label>
 
-    Search by Season:
-    <select id="season-filter">
-        <option value="all">Any Season</option>
-    </select>
-</div>
+    <label>
+        Search by Season:
+        <select id="season-filter" name="season">
+            <option value="all">Any Season</option>
+        </select>
+    </label>
+
+    <label>
+        Keyword:
+        <input type="search" id="trip-search" name="q" maxlength="100"
+            placeholder="Trip name or description">
+    </label>
+
+    <button type="submit" class="pagination-btn">Search</button>
+    <button type="button" class="trip-filters-clear" id="trip-filters-clear">Clear</button>
+</form>
 
 <div class="trips-state" id="trips-loading">Loading trips...</div>
 <div class="trips-state trips-error" id="trips-error" hidden></div>
