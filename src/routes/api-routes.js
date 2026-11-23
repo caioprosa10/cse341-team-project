@@ -12,7 +12,7 @@ import {
 import { getAllStations, getStationById } from '../controllers/stations.js';
 import { getTrainById } from '../controllers/trains.js';
 import { getTrainsForPage } from '../controllers/trains-page.js';
-import { getAllTrips, getTripById, putTrip, removeTrip } from '../controllers/trips.js';
+import { getTripById, listTrips, putTrip, removeTrip } from '../controllers/trips.js';
 import { getSchedulesForTrip, getSchedulesForTripAndMonth } from '../controllers/schedules.js';
 import { listTicketClasses } from '../controllers/ticket-classes.js';
 import { Router } from 'express';
@@ -21,18 +21,114 @@ const router = Router();
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     PageMeta:
+ *       type: object
+ *       description: Where this response sits in the full set of results.
+ *       properties:
+ *         page:
+ *           type: integer
+ *           description: The page that was returned, starting at 1
+ *           example: 1
+ *         limit:
+ *           type: integer
+ *           description: The most items a page can hold
+ *           example: 10
+ *         totalItems:
+ *           type: integer
+ *           description: How many items match, across every page
+ *           example: 6
+ *         totalPages:
+ *           type: integer
+ *           description: How many pages there are at this limit (0 when nothing matches)
+ *           example: 1
+ *         hasPreviousPage:
+ *           type: boolean
+ *           example: false
+ *         hasNextPage:
+ *           type: boolean
+ *           example: false
+ *     Error:
+ *       type: object
+ *       properties:
+ *         error:
+ *           type: string
+ *           example: page must be a whole number of 1 or more
+ */
+
+/**
+ * @openapi
  * /api/trips:
  *   get:
- *     summary: Get all trips
+ *     summary: Get one page of trips
+ *     description: >
+ *       Returns the trips sorted by name, one page at a time. The trips are in
+ *       trips and the paging details are in meta. Without page or limit the
+ *       first ten trips are returned. A page past the last one is not an
+ *       error: it returns an empty trips array, and meta.totalPages tells the
+ *       client where the results end.
  *     tags:
  *       - Trips
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         description: The page to return, starting at 1
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         description: How many trips a page holds, from 1 to 50
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 50
+ *           default: 10
  *     responses:
  *       200:
- *         description: A list of trips
+ *         description: One page of trips and the metadata for that page
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 trips:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 meta:
+ *                   $ref: '#/components/schemas/PageMeta'
+ *             example:
+ *               trips:
+ *                 - id: alpine-panorama
+ *                   name: Alpine Panorama Express
+ *                   region: central
+ *                   bestSeason: autumn
+ *                 - id: coastal-breeze
+ *                   name: Coastal Breeze Line
+ *                   region: northern
+ *                   bestSeason: summer
+ *               meta:
+ *                 page: 1
+ *                 limit: 2
+ *                 totalItems: 6
+ *                 totalPages: 3
+ *                 hasPreviousPage: false
+ *                 hasNextPage: true
+ *       400:
+ *         description: page or limit is not a valid whole number, or limit is above 50
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       500:
  *         description: Failed to fetch trips
  */
-router.get('/api/trips', getAllTrips);
+router.get('/api/trips', listTrips);
 
 /**
  * @openapi

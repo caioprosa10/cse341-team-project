@@ -16,11 +16,30 @@ const setError = (element, message) => {
     }
 };
 
+/*
+ * Fetches JSON. When the API refuses the request, the error carries the
+ * status and the API's own message ({ "error": "..." }) so a page can show
+ * the visitor what was wrong with a 400 instead of a generic failure.
+ */
 const fetchJson = async (url) => {
     const response = await fetch(url);
 
     if (!response.ok) {
-        throw new Error(`Request failed (${response.status})`);
+        let message = `Request failed (${response.status})`;
+
+        try {
+            const body = await response.json();
+
+            if (body && body.error) {
+                message = body.error;
+            }
+        } catch {
+            // The body was not JSON; keep the generic message.
+        }
+
+        const error = new Error(message);
+        error.status = response.status;
+        throw error;
     }
 
     return response.json();
@@ -117,10 +136,19 @@ const buildTripCard = (trip, templateEl) => {
     return card;
 };
 
+/*
+ * Replaces the options of a filter dropdown, keeping its first "all" option
+ * and the value the visitor had picked if it is still on offer.
+ */
 const fillFilter = (selectEl, values) => {
     if (!selectEl) {
         return;
     }
+
+    const selected = selectEl.value;
+    const allOption = selectEl.options[0];
+
+    selectEl.replaceChildren(allOption);
 
     values.forEach((value) => {
         const option = document.createElement('option');
@@ -128,14 +156,29 @@ const fillFilter = (selectEl, values) => {
         option.textContent = capitalise(value);
         selectEl.appendChild(option);
     });
+
+    selectEl.value = values.includes(selected) ? selected : allOption.value;
 };
 
-const hookTripsCatalog = async () => {
+/*
+ * The trip list asks /api/trips for one page at a time. The page number and
+ * the page size live in the address bar (/trips?page=2), so a refresh, a
+ * bookmark or the back button lands on the same page. The browser passes
+ * them to the API as they are, and the API decides whether they are valid.
+ */
+const TRIP_QUERY_KEYS = ['page', 'limit'];
+
+const hookTripsCatalog = () => {
     const listEl = document.getElementById('trips-list');
     const templateEl = document.getElementById('trip-card-template');
     const loadingEl = document.getElementById('trips-loading');
     const errorEl = document.getElementById('trips-error');
     const emptyEl = document.getElementById('trips-empty');
+    const summaryEl = document.getElementById('trips-summary');
+    const paginationEl = document.getElementById('trips-pagination');
+    const prevButton = document.getElementById('trips-prev');
+    const nextButton = document.getElementById('trips-next');
+    const pageStatusEl = document.getElementById('trips-page-status');
     const regionSelect = document.getElementById('region-filter');
     const seasonSelect = document.getElementById('season-filter');
 
@@ -143,12 +186,15 @@ const hookTripsCatalog = async () => {
         return;
     }
 
-    let allTrips = [];
+    let pageTrips = [];
+    let meta = null;
 
-    const render = () => {
+    // The region and season dropdowns still filter in the browser, so for now
+    // they narrow the page that is on screen.
+    const renderCards = () => {
         const region = regionSelect ? regionSelect.value : 'all';
         const season = seasonSelect ? seasonSelect.value : 'all';
-        const visible = allTrips.filter((trip) => {
+        const visible = pageTrips.filter((trip) => {
             const regionMatches = region === 'all' || trip.region === region;
             const seasonMatches = season === 'all' || trip.bestSeason === season;
 
@@ -164,28 +210,117 @@ const hookTripsCatalog = async () => {
         showState(emptyEl, visible.length === 0);
     };
 
-    try {
-        allTrips = await fetchJson('/api/trips');
+    const renderPagination = () => {
+        if (!meta || meta.totalItems === 0) {
+            showState(paginationEl, false);
+            summaryEl.textContent = '';
 
-        const regions = [...new Set(allTrips.map((trip) => trip.region))].sort();
-        const seasons = [...new Set(allTrips.map((trip) => trip.bestSeason))].sort();
-
-        fillFilter(regionSelect, regions);
-        fillFilter(seasonSelect, seasons);
-
-        if (regionSelect) {
-            regionSelect.addEventListener('change', render);
-        }
-        if (seasonSelect) {
-            seasonSelect.addEventListener('change', render);
+            return;
         }
 
-        render();
+        const first = (meta.page - 1) * meta.limit + 1;
+        const last = first + pageTrips.length - 1;
+
+        summaryEl.textContent = `Showing ${first}-${last} of ${meta.totalItems} trips`;
+        pageStatusEl.textContent = `Page ${meta.page} of ${meta.totalPages}`;
+        prevButton.disabled = !meta.hasPreviousPage;
+        nextButton.disabled = !meta.hasNextPage;
+        showState(paginationEl, true);
+    };
+
+    // Copies the paging values from the address bar into the API request.
+    const buildApiUrl = () => {
+        const pageParams = new URLSearchParams(window.location.search);
+        const apiParams = new URLSearchParams();
+
+        TRIP_QUERY_KEYS.forEach((key) => {
+            if (pageParams.has(key)) {
+                apiParams.set(key, pageParams.get(key));
+            }
+        });
+
+        const query = apiParams.toString();
+
+        return query ? `/api/trips?${query}` : '/api/trips';
+    };
+
+    const setPageInAddress = (page, replace) => {
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', String(page));
+
+        const url = `${window.location.pathname}?${params.toString()}`;
+
+        if (replace) {
+            window.history.replaceState(null, '', url);
+        } else {
+            window.history.pushState(null, '', url);
+        }
+    };
+
+    const load = async () => {
+        showState(loadingEl, true);
+        showState(errorEl, false);
+        showState(emptyEl, false);
+        prevButton.disabled = true;
+        nextButton.disabled = true;
+
+        try {
+            const payload = await fetchJson(buildApiUrl());
+
+            // A bookmarked page that no longer exists: go to the last real one.
+            if (payload.trips.length === 0 && payload.meta.page > payload.meta.totalPages
+                && payload.meta.totalPages > 0) {
+                setPageInAddress(payload.meta.totalPages, true);
+
+                return load();
+            }
+
+            pageTrips = payload.trips;
+            meta = payload.meta;
+
+            fillFilter(regionSelect, [...new Set(pageTrips.map((trip) => trip.region))].sort());
+            fillFilter(seasonSelect, [...new Set(pageTrips.map((trip) => trip.bestSeason))].sort());
+
+            renderCards();
+            renderPagination();
+        } catch (error) {
+            pageTrips = [];
+            meta = null;
+            listEl.replaceChildren();
+            renderPagination();
+            setError(
+                errorEl,
+                error.status === 400
+                    ? `Unable to show these trips: ${error.message}.`
+                    : 'Unable to load trips right now. Please try again in a moment.'
+            );
+        }
+
         showState(loadingEl, false);
-    } catch (error) {
-        showState(loadingEl, false);
-        setError(errorEl, 'Unable to load trips right now. Please try again in a moment.');
+
+        return undefined;
+    };
+
+    const goToPage = async (page) => {
+        setPageInAddress(page, false);
+        await load();
+        listEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    prevButton.addEventListener('click', () => goToPage(meta.page - 1));
+    nextButton.addEventListener('click', () => goToPage(meta.page + 1));
+
+    if (regionSelect) {
+        regionSelect.addEventListener('change', renderCards);
     }
+    if (seasonSelect) {
+        seasonSelect.addEventListener('change', renderCards);
+    }
+
+    // Back and forward buttons change the address without reloading.
+    window.addEventListener('popstate', load);
+
+    load();
 };
 
 /* ------------------------------------------------------------------ *
@@ -658,10 +793,13 @@ const hookTripsAdmin = async () => {
     };
 
     try {
-        const [trips, stations] = await Promise.all([
-            fetchJson('/api/trips'),
+        // /api/trips is paged now. This page still edits the whole catalogue
+        // in one list, so it asks for the largest page the API allows.
+        const [tripsPage, stations] = await Promise.all([
+            fetchJson('/api/trips?limit=50'),
             fetchJson('/api/stations')
         ]);
+        const trips = tripsPage.trips;
         const fragment = document.createDocumentFragment();
 
         trips.forEach((tripItem) => {

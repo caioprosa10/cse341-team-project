@@ -13,6 +13,53 @@
         color: #8f1f1f;
     }
 
+    /* Paged lists: the count above the list and the controls below it. */
+    .trips-summary {
+        margin-bottom: var(--space-md);
+        color: var(--clr-text-secondary);
+        font-size: var(--font-size-sm);
+    }
+
+    .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-md);
+        margin: var(--space-xl) 0;
+    }
+
+    /* display: flex above would otherwise win over the hidden attribute. */
+    .pagination[hidden] {
+        display: none;
+    }
+
+    .pagination-btn {
+        padding: var(--space-xs) var(--space-lg);
+        border: 1px solid var(--clr-primary);
+        border-radius: var(--radius-md);
+        background-color: var(--clr-primary);
+        color: var(--clr-text-alt-primary);
+        font-family: inherit;
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+    }
+
+    .pagination-btn:hover:not(:disabled) {
+        background-color: var(--clr-accent);
+    }
+
+    .pagination-btn:disabled {
+        border-color: var(--clr-border);
+        background-color: transparent;
+        color: var(--clr-text-muted);
+        cursor: not-allowed;
+    }
+
+    .pagination-status {
+        color: var(--clr-text-secondary);
+        font-size: var(--font-size-sm);
+    }
+
     /* Trip details: month picker above the schedules. */
     .schedule-filter {
         display: flex;
