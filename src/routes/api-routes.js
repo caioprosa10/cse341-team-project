@@ -12,7 +12,13 @@ import {
 import { getAllStations, getStationById } from '../controllers/stations.js';
 import { getTrainById } from '../controllers/trains.js';
 import { getTrainsForPage } from '../controllers/trains-page.js';
-import { getTripById, listTrips, putTrip, removeTrip } from '../controllers/trips.js';
+import {
+    getTripById,
+    listTripFilters,
+    listTrips,
+    putTrip,
+    removeTrip
+} from '../controllers/trips.js';
 import { getSchedulesForTrip, getSchedulesForTripAndMonth } from '../controllers/schedules.js';
 import { listTicketClasses } from '../controllers/ticket-classes.js';
 import { Router } from 'express';
@@ -49,6 +55,24 @@ const router = Router();
  *         hasNextPage:
  *           type: boolean
  *           example: false
+ *     TripFilters:
+ *       type: object
+ *       description: >
+ *         The filters that were applied, after trimming and lowercasing.
+ *         A filter that was not used is null.
+ *       properties:
+ *         region:
+ *           type: string
+ *           nullable: true
+ *           example: central
+ *         season:
+ *           type: string
+ *           nullable: true
+ *           example: autumn
+ *         q:
+ *           type: string
+ *           nullable: true
+ *           example: gorge
  *     Error:
  *       type: object
  *       properties:
@@ -61,13 +85,15 @@ const router = Router();
  * @openapi
  * /api/trips:
  *   get:
- *     summary: Get one page of trips
+ *     summary: Search, filter and page through the trips
  *     description: >
  *       Returns the trips sorted by name, one page at a time. The trips are in
- *       trips and the paging details are in meta. Without page or limit the
- *       first ten trips are returned. A page past the last one is not an
- *       error: it returns an empty trips array, and meta.totalPages tells the
- *       client where the results end.
+ *       trips and the details of the query are in meta: the paging values and
+ *       the filters that were applied. region, season and q can be combined,
+ *       and a trip must match all of them. Without any parameter the first
+ *       ten trips are returned. A page past the last one is not an error: it
+ *       returns an empty trips array, and meta.totalPages tells the client
+ *       where the results end.
  *     tags:
  *       - Trips
  *     parameters:
@@ -88,9 +114,38 @@ const router = Router();
  *           minimum: 1
  *           maximum: 50
  *           default: 10
+ *       - in: query
+ *         name: region
+ *         required: false
+ *         description: >
+ *           Only trips in this region. Must be one of the regions returned by
+ *           /api/trips/filters. Not case sensitive.
+ *         schema:
+ *           type: string
+ *           example: central
+ *       - in: query
+ *         name: season
+ *         required: false
+ *         description: >
+ *           Only trips whose best season is this one. Must be one of the
+ *           seasons returned by /api/trips/filters. Not case sensitive.
+ *         schema:
+ *           type: string
+ *           example: autumn
+ *       - in: query
+ *         name: q
+ *         required: false
+ *         description: >
+ *           A keyword to look for anywhere in the trip name or description.
+ *           Not case sensitive, at most 100 characters. Characters such as
+ *           ( or * are searched for literally.
+ *         schema:
+ *           type: string
+ *           maxLength: 100
+ *           example: gorge
  *     responses:
  *       200:
- *         description: One page of trips and the metadata for that page
+ *         description: One page of the matching trips and the metadata for the query
  *         content:
  *           application/json:
  *             schema:
@@ -101,34 +156,72 @@ const router = Router();
  *                   items:
  *                     type: object
  *                 meta:
- *                   $ref: '#/components/schemas/PageMeta'
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/PageMeta'
+ *                     - type: object
+ *                       properties:
+ *                         filters:
+ *                           $ref: '#/components/schemas/TripFilters'
  *             example:
  *               trips:
  *                 - id: alpine-panorama
  *                   name: Alpine Panorama Express
  *                   region: central
  *                   bestSeason: autumn
- *                 - id: coastal-breeze
- *                   name: Coastal Breeze Line
- *                   region: northern
- *                   bestSeason: summer
+ *                 - id: gorge-explorer
+ *                   name: Kurobe Gorge Explorer
+ *                   region: central
+ *                   bestSeason: autumn
  *               meta:
  *                 page: 1
- *                 limit: 2
- *                 totalItems: 6
- *                 totalPages: 3
+ *                 limit: 10
+ *                 totalItems: 2
+ *                 totalPages: 1
  *                 hasPreviousPage: false
- *                 hasNextPage: true
+ *                 hasNextPage: false
+ *                 filters:
+ *                   region: central
+ *                   season: autumn
+ *                   q: null
  *       400:
- *         description: page or limit is not a valid whole number, or limit is above 50
+ *         description: >
+ *           page or limit is not a valid whole number, limit is above 50, the
+ *           region or season does not exist, q is longer than 100 characters,
+ *           or a parameter was repeated
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: 'region must be one of: central, hokkaido, kansai, northern'
  *       500:
  *         description: Failed to fetch trips
  */
 router.get('/api/trips', listTrips);
+
+/**
+ * @openapi
+ * /api/trips/filters:
+ *   get:
+ *     summary: Get the regions and seasons trips can be filtered by
+ *     description: >
+ *       The distinct regions and best seasons in the trips collection, sorted.
+ *       The trip list fills its dropdowns from this, and these are the only
+ *       values /api/trips accepts for region and season.
+ *     tags:
+ *       - Trips
+ *     responses:
+ *       200:
+ *         description: The available filter values
+ *         content:
+ *           application/json:
+ *             example:
+ *               regions: [central, hokkaido, kansai, northern]
+ *               seasons: [autumn, spring, summer, winter]
+ *       500:
+ *         description: Failed to fetch trip filters
+ */
+router.get('/api/trips/filters', listTripFilters);
 
 /**
  * @openapi

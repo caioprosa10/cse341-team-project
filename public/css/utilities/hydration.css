@@ -13,6 +13,39 @@
         color: #8f1f1f;
     }
 
+    /* Trip list: dropdowns, keyword box and buttons above the cards. */
+    .trip-filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-sm) var(--space-md);
+        margin-bottom: var(--space-lg);
+    }
+
+    .trip-filters input[type="search"] {
+        min-width: 16rem;
+        padding: var(--space-xxs) var(--space-sm);
+        border: 1px solid var(--clr-border);
+        border-radius: var(--radius-sm);
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    .trip-filters-clear {
+        padding: var(--space-xs) var(--space-lg);
+        border: 1px solid var(--clr-border);
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--clr-text-secondary);
+        font-family: inherit;
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+    }
+
+    .trip-filters-clear:hover {
+        background: var(--clr-primary-pale);
+    }
+
     /* Paged lists: the count above the list and the controls below it. */
     .trips-summary {
         margin-bottom: var(--space-md);

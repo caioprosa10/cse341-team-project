@@ -125,3 +125,121 @@ pagination of its own.
 - [ ] `/admin/trips` still lists every trip.
 - [ ] Swagger UI shows the new parameters and the response example.
 - [ ] `npm test` and `npm run lint` pass.
+
+---
+
+## Pull Request 2: Filter by region and season, and search by keyword
+
+### Description
+Move the region and season filters from the browser to the API, add a keyword
+search over the trip names and descriptions, and keep the results paged. Before
+this, the dropdowns could only narrow the page already on screen; now every
+filter runs against the whole collection and the paging counts the matches.
+
+### API: `GET /api/trips`
+
+New query parameters, all optional and combinable with each other and with
+`page` and `limit`. A trip must match every filter that is given.
+
+| Query parameter | Type | Rule | MongoDB filter |
+| --- | --- | --- | --- |
+| `region` | string | One of the regions in the trips collection. Trimmed and lowercased first. | `{ region }` |
+| `season` | string | One of the best seasons in the trips collection. Trimmed and lowercased first. | `{ bestSeason: season }` |
+| `q` | string | At most 100 characters after trimming. | `{ $or: [{ name: /q/i }, { description: /q/i }] }` |
+
+- A blank value (`?q=` or `?q=%20`) counts as missing.
+- The keyword is escaped before it becomes a regular expression, so `(` or `.*`
+  is searched for literally and cannot break or widen the query.
+- A region or season that does not exist is a `400` whose message lists the
+  valid values, rather than an empty page that looks like "no trips".
+- A repeated parameter (`?region=a&region=b`) is a `400`.
+
+#### 200 response
+`meta` gains `filters`, the values that were actually applied (after trimming
+and lowercasing), with `null` for a filter that was not used:
+
+```json
+{
+  "trips": [
+    { "id": "alpine-panorama", "name": "Alpine Panorama Express", "...": "..." },
+    { "id": "gorge-explorer", "name": "Kurobe Gorge Explorer", "...": "..." }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "totalItems": 2,
+    "totalPages": 1,
+    "hasPreviousPage": false,
+    "hasNextPage": false,
+    "filters": { "region": "central", "season": "autumn", "q": null }
+  }
+}
+```
+
+#### 400 response
+
+```json
+{ "error": "region must be one of: central, hokkaido, kansai, northern" }
+```
+
+### API: `GET /api/trips/filters` (new)
+Answers `200` with the distinct regions and best seasons, sorted:
+
+```json
+{
+  "regions": ["central", "hokkaido", "kansai", "northern"],
+  "seasons": ["autumn", "spring", "summer", "winter"]
+}
+```
+
+The page fills its dropdowns from here, because a single page of trips no
+longer contains every region and season. It is registered before
+`/api/trips/:id` so that `filters` is not read as a trip id.
+
+### Code
+| File | Change |
+| --- | --- |
+| `src/includes/trip-filters.js` | New. `parseTripFilters(query, allowed)` returns `{ filters, mongoFilter }`; `escapeRegex(text)`. |
+| `src/models/trips.js` | `getTripsPage` takes a `filter`; new `getTripFilterOptions()` using `distinct`. |
+| `src/controllers/trips.js` | `listTrips` applies the filters and adds `meta.filters`; new `listTripFilters`. |
+| `src/routes/api-routes.js` | New route `/api/trips/filters`; Swagger for the new parameters, `TripFilters` component and the new route. |
+| `swagger.json` | Regenerated. |
+| `src/views/trips/list.ejs` | The filters become a search form: both dropdowns, a keyword box, Search and Clear. |
+| `public/js/main.js` | Filters go to the API through the address bar; no more filtering in the browser. |
+| `public/css/utilities/hydration.css` | Filter form styles. |
+| `tests/trips.test.js` | Filter, search and validation tests. |
+
+### Page behaviour
+- The dropdowns apply as soon as they change. The keyword applies on Enter or
+  Search, so the API is not called on every keystroke.
+- Every filter change goes back to page 1 and keeps the page size.
+- Clear resets both dropdowns and the keyword.
+- The filters are in the address (`/trips?region=central&q=gorge`), so a link
+  opens with the same filters selected, and back / forward restore them.
+- The summary uses `meta.filters`, for example
+  "Showing 1-2 of 2 trips (region Central, best in autumn)".
+- When nothing matches, the empty message shows and the pagination hides.
+
+### Test plan
+- [ ] `GET /api/trips` has `meta.filters = { region: null, season: null, q: null }`.
+- [ ] `?region=kansai` returns Sagano Romantic Train and Sakura Valley Limited.
+- [ ] `?season=autumn` returns three trips.
+- [ ] `?region=central&season=autumn` returns Alpine Panorama Express and Kurobe Gorge Explorer.
+- [ ] `?region=Kansai&season=SPRING` returns Sakura Valley Limited and reports the lowercase values.
+- [ ] `?q=gorge` and `?q=GORGE` both return Kurobe Gorge Explorer (name) and Sagano Romantic Train (description).
+- [ ] `?q=cranes` returns Winter Wetlands Steam Train.
+- [ ] `?q=.*` and `?q=(` return 200 and no trips.
+- [ ] `?q=%20%20` returns all six trips with `filters.q: null`.
+- [ ] `?season=autumn&limit=2&page=2` returns one trip with `totalItems: 3, totalPages: 2`.
+- [ ] `?region=hokkaido&season=summer` returns 200, no trips and `totalPages: 0`.
+- [ ] `region=mars`, `season=monsoon`, `region=central&region=kansai` and a 101 character `q` each return 400 with a message.
+- [ ] `GET /api/trips/filters` returns the four regions and four seasons.
+- [ ] On `/trips`, each dropdown narrows the list across all pages and resets to page 1.
+- [ ] Typing "gorge" and pressing Enter shows two trips and puts `q=gorge` in the address.
+- [ ] A keyword with no match shows the empty message and hides the pagination.
+- [ ] Clear shows every trip again.
+- [ ] Opening `/trips?region=central&season=autumn` selects both dropdowns.
+- [ ] Back after a search restores the previous results and the keyword box.
+- [ ] `/trips?region=mars` shows the API's error message.
+- [ ] Swagger UI shows `region`, `season`, `q`, the `meta.filters` example and `/api/trips/filters`.
+- [ ] `npm test` and `npm run lint` pass.

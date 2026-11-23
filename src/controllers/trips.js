@@ -3,9 +3,11 @@ import { QueryError, buildPaginationMeta, parsePagination } from '../includes/pa
 import {
     deleteTrip,
     getTripById as findTripById,
+    getTripFilterOptions,
     getTripsPage,
     updateTrip
 } from '../models/trips.js';
+import { parseTripFilters } from '../includes/trip-filters.js';
 
 const MONTH_NAMES = [
     'January',
@@ -27,18 +29,24 @@ const MONTH_NAMES = [
  * ------------------------------------------------------------------ */
 
 /**
- * GET /api/trips?page=&limit=
- * Answers with one page of trips and the metadata for that page:
- * { trips: [...], meta: { page, limit, totalItems, totalPages, ... } }
+ * GET /api/trips?page=&limit=&region=&season=&q=
+ * Answers with one page of the matching trips and the metadata for that page,
+ * including the filters that were applied:
+ * { trips: [...], meta: { page, limit, totalItems, totalPages, ..., filters } }
  */
 const listTrips = async (req, res) => {
     try {
         const { page, limit, skip } = parsePagination(req.query);
-        const { trips, totalItems } = await getTripsPage({ skip, limit });
+        const allowed = await getTripFilterOptions();
+        const { filters, mongoFilter } = parseTripFilters(req.query, allowed);
+        const { trips, totalItems } = await getTripsPage({ filter: mongoFilter, skip, limit });
 
         return res.status(200).json({
             trips,
-            meta: buildPaginationMeta({ page, limit, totalItems })
+            meta: {
+                ...buildPaginationMeta({ page, limit, totalItems }),
+                filters
+            }
         });
     } catch (error) {
         if (error instanceof QueryError) {
@@ -48,6 +56,22 @@ const listTrips = async (req, res) => {
         console.error('Error fetching trips:', error);
 
         return res.status(500).json({ error: 'Failed to fetch trips' });
+    }
+};
+
+/**
+ * GET /api/trips/filters
+ * The regions and seasons the trip list can be filtered by.
+ */
+const listTripFilters = async (req, res) => {
+    try {
+        const options = await getTripFilterOptions();
+
+        return res.status(200).json(options);
+    } catch (error) {
+        console.error('Error fetching trip filters:', error);
+
+        return res.status(500).json({ error: 'Failed to fetch trip filters' });
     }
 };
 
@@ -148,6 +172,7 @@ const tripsAdminPage = (req, res) => {
 
 export {
     getTripById,
+    listTripFilters,
     listTrips,
     listTripsPage,
     putTrip,
