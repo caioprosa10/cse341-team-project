@@ -1,8 +1,9 @@
 // src/controllers/trips.js
+import { QueryError, buildPaginationMeta, parsePagination } from '../includes/pagination.js';
 import {
     deleteTrip,
-    getAllTrips as findAllTrips,
     getTripById as findTripById,
+    getTripsPage,
     updateTrip
 } from '../models/trips.js';
 
@@ -25,12 +26,25 @@ const MONTH_NAMES = [
  * API controllers: these send JSON.                                   *
  * ------------------------------------------------------------------ */
 
-const getAllTrips = async (req, res) => {
+/**
+ * GET /api/trips?page=&limit=
+ * Answers with one page of trips and the metadata for that page:
+ * { trips: [...], meta: { page, limit, totalItems, totalPages, ... } }
+ */
+const listTrips = async (req, res) => {
     try {
-        const trips = await findAllTrips();
+        const { page, limit, skip } = parsePagination(req.query);
+        const { trips, totalItems } = await getTripsPage({ skip, limit });
 
-        return res.status(200).json(trips);
+        return res.status(200).json({
+            trips,
+            meta: buildPaginationMeta({ page, limit, totalItems })
+        });
     } catch (error) {
+        if (error instanceof QueryError) {
+            return res.status(400).json({ error: error.message });
+        }
+
         console.error('Error fetching trips:', error);
 
         return res.status(500).json({ error: 'Failed to fetch trips' });
@@ -133,8 +147,8 @@ const tripsAdminPage = (req, res) => {
 };
 
 export {
-    getAllTrips,
     getTripById,
+    listTrips,
     listTripsPage,
     putTrip,
     removeTrip,
