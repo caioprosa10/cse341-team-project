@@ -102,3 +102,135 @@ describe('GET /api/trips pagination', () => {
     expect(response.body.error).toContain(field);
   });
 });
+
+describe('GET /api/trips filtering and searching', () => {
+  const namesOf = (response) => response.body.trips.map((trip) => trip.name);
+
+  test('reports the filters in meta, null when not used', async () => {
+    const response = await request(app).get('/api/trips');
+
+    expect(response.body.meta.filters).toEqual({ region: null, season: null, q: null });
+  });
+
+  test('filters by region', async () => {
+    const response = await request(app).get('/api/trips?region=kansai');
+
+    expect(response.status).toBe(200);
+    expect(namesOf(response)).toEqual(['Sagano Romantic Train', 'Sakura Valley Limited']);
+    expect(response.body.meta).toMatchObject({
+      totalItems: 2,
+      totalPages: 1,
+      filters: { region: 'kansai', season: null, q: null }
+    });
+  });
+
+  test('filters by season', async () => {
+    const response = await request(app).get('/api/trips?season=autumn');
+
+    expect(namesOf(response)).toEqual([
+      'Alpine Panorama Express',
+      'Kurobe Gorge Explorer',
+      'Sagano Romantic Train'
+    ]);
+  });
+
+  test('combines region and season', async () => {
+    const response = await request(app).get('/api/trips?region=central&season=autumn');
+
+    expect(namesOf(response)).toEqual(['Alpine Panorama Express', 'Kurobe Gorge Explorer']);
+    expect(response.body.meta.filters).toEqual({ region: 'central', season: 'autumn', q: null });
+  });
+
+  test('accepts the region and season in any case', async () => {
+    const response = await request(app).get('/api/trips?region=Kansai&season=SPRING');
+
+    expect(namesOf(response)).toEqual(['Sakura Valley Limited']);
+    expect(response.body.meta.filters).toMatchObject({ region: 'kansai', season: 'spring' });
+  });
+
+  test('searches the names and the descriptions without regard to case', async () => {
+    const lower = await request(app).get('/api/trips?q=gorge');
+    const upper = await request(app).get('/api/trips?q=GORGE');
+
+    // Kurobe matches on its name, Sagano only on its description.
+    expect(namesOf(lower)).toEqual(['Kurobe Gorge Explorer', 'Sagano Romantic Train']);
+    expect(namesOf(upper)).toEqual(namesOf(lower));
+    expect(lower.body.meta.filters.q).toBe('gorge');
+  });
+
+  test('finds a word that only appears in a description', async () => {
+    const response = await request(app).get('/api/trips?q=cranes');
+
+    expect(namesOf(response)).toEqual(['Winter Wetlands Steam Train']);
+  });
+
+  test('searches for special characters literally', async () => {
+    const everything = await request(app).get('/api/trips?q=.*');
+    const bracket = await request(app).get('/api/trips?q=(');
+
+    expect(everything.status).toBe(200);
+    expect(everything.body.trips).toEqual([]);
+    expect(bracket.status).toBe(200);
+    expect(bracket.body.trips).toEqual([]);
+  });
+
+  test('treats a blank keyword as no keyword', async () => {
+    const response = await request(app).get('/api/trips?q=%20%20');
+
+    expect(response.body.meta.totalItems).toBe(6);
+    expect(response.body.meta.filters.q).toBeNull();
+  });
+
+  test('pages through filtered results', async () => {
+    const response = await request(app).get('/api/trips?season=autumn&limit=2&page=2');
+
+    expect(namesOf(response)).toEqual(['Sagano Romantic Train']);
+    expect(response.body.meta).toMatchObject({
+      page: 2,
+      limit: 2,
+      totalItems: 3,
+      totalPages: 2,
+      hasPreviousPage: true,
+      hasNextPage: false,
+      filters: { season: 'autumn' }
+    });
+  });
+
+  test('returns an empty page with the totals when nothing matches', async () => {
+    const response = await request(app).get('/api/trips?region=hokkaido&season=summer');
+
+    expect(response.status).toBe(200);
+    expect(response.body.trips).toEqual([]);
+    expect(response.body.meta).toMatchObject({ totalItems: 0, totalPages: 0, hasNextPage: false });
+  });
+
+  test.each([
+    ['region=mars', 'region must be one of'],
+    ['season=monsoon', 'season must be one of'],
+    ['region=central&region=kansai', 'region must be a single value'],
+    [`q=${'x'.repeat(101)}`, 'q must be 100 characters or fewer']
+  ])('rejects ?%s with a 400', async (query, message) => {
+    const response = await request(app).get(`/api/trips?${query}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain(message);
+  });
+});
+
+describe('GET /api/trips/filters', () => {
+  test('lists the regions and seasons in the starter data', async () => {
+    const response = await request(app).get('/api/trips/filters');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      regions: ['central', 'hokkaido', 'kansai', 'northern'],
+      seasons: ['autumn', 'spring', 'summer', 'winter']
+    });
+  });
+
+  test('is not mistaken for a trip id', async () => {
+    const response = await request(app).get('/api/trips/filters');
+
+    expect(response.body).not.toHaveProperty('error');
+  });
+});
