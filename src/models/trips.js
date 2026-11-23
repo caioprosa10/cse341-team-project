@@ -10,29 +10,45 @@ const getAllTrips = async () => {
 };
 
 /**
- * One page of trips, sorted by name, and the number of trips in total.
+ * One page of the trips that match a filter, sorted by name, and the number
+ * of matching trips in total.
  *
  * The _id is a tie breaker: two trips with the same name would otherwise come
  * back in any order, and a trip could show up on two pages or on none.
  *
  * The count runs first so that a page past the end never sends Mongo a huge
  * skip value; it simply answers with no trips.
+ *
+ * @param {{ filter?: object, skip: number, limit: number }} options
  */
-const getTripsPage = async ({ skip, limit }) => {
-    const totalItems = await trip.countDocuments({});
+const getTripsPage = async ({ filter = {}, skip, limit }) => {
+    const totalItems = await trip.countDocuments(filter);
 
     if (skip >= totalItems) {
         return { trips: [], totalItems };
     }
 
     const trips = await trip
-        .find({})
+        .find(filter)
         .sort({ name: 1, _id: 1 })
         .skip(skip)
         .limit(limit)
         .lean();
 
     return { trips, totalItems };
+};
+
+/**
+ * The regions and seasons that exist in the trips, sorted. They fill the
+ * dropdowns on the trip list and are the only values the filters accept.
+ */
+const getTripFilterOptions = async () => {
+    const [regions, seasons] = await Promise.all([
+        trip.distinct('region'),
+        trip.distinct('bestSeason')
+    ]);
+
+    return { regions: regions.sort(), seasons: seasons.sort() };
 };
 
 const UPDATABLE = [
@@ -68,4 +84,4 @@ const deleteTrip = async (id) => {
     return Boolean(removed);
 };
 
-export { deleteTrip, getAllTrips, getTripById, getTripsPage, updateTrip };
+export { deleteTrip, getAllTrips, getTripById, getTripFilterOptions, getTripsPage, updateTrip };
